@@ -12,6 +12,13 @@
 #include "simAVRHeader.h"
 #endif
 
+enum Sound_States { Sound_Start, Sound_Off, Sound_OnC4, Sound_OnD4, Sound_OnE4 } Sound_State;
+
+volatile unsigned char TimerFlag = 0;
+unsigned char frequency;
+
+void TimerISR() { TimerFlag = 1; }
+
 // 0.954 hz is lowest frequency possible with this function,
 // based on settings in PWM_on()
 // Passing in 0 as the frequency will stop the speaker from generating sound
@@ -53,13 +60,121 @@ void PWM_off() {
 	TCCR3B = 0x00;
 }
 
+void Tick_Sound() {
+	switch (Sound_State)
+	{
+		case Sound_Start:
+			Sound_State = Sound_Off;
+			break;
+		case Sound_Off:
+			if (tmpA == 0x00)
+			{
+				Sound_State = Sound_OnC4;
+				frequency = 261.63;
+				PWM_On();
+			}
+			else if (tmpA == 0x03)
+			{
+				Sound_State = Sound_OnD4;
+				frequency = 293.66;
+				PWM_On();
+			}
+			else if (tmpA == 0x05)
+			{
+				Sound_State = Sound_OnE4;
+				frequency = 329.63;
+				PWM_On();
+			}
+			break;
+		case Sound_OnC4:
+			if (((tmpA == 0x01 || tmpA == 0x02) || (tmpA == 0x07 || tmpA = 0x06)) || tmpA == 0x04)
+			{
+				Sound_State = Sound_Off;
+			}
+			else if (tmpA == 0x03)
+			{
+				Sound_State = Sound_OnD4;
+				frequency = 293.66;
+				PWM_On();
+			}
+			else if (tmpA == 0x05)
+			{
+				Sound_State = Sound_OnE4;
+				frequency = 329.63;
+				PWM_On();
+			}
+			break;
+		case Sound_OnD4:
+			if (((tmpA == 0x01 || tmpA == 0x02) || (tmpA == 0x07 || tmpA = 0x06)) || tmpA == 0x04)
+			{
+				Sound_State = Sound_Off;
+			}
+			else if (tmpA == 0x00)
+			{
+				Sound_State = Sound_OnC4;
+				frequency = 261.63;
+				PWM_On();
+			}
+			else if (tmpA == 0x05)
+			{
+				Sound_State = Sound_OnE4;
+				frequency = 329.63;
+				PWM_On();
+			}
+			break;
+		case Sound_OnE4:
+			if (((tmpA == 0x01 || tmpA == 0x02) || (tmpA == 0x07 || tmpA = 0x06)) || tmpA == 0x04)
+			{
+				Sound_State = Sound_Off;
+			}
+			else if (tmpA == 0x00)
+			{
+				Sound_State = Sound_OnC4;
+				frequency = 261.63;
+				PWM_On();
+			}
+			else if (tmpA == 0x03)
+			{
+				Sound_State = Sound_OnD4;
+				frequency = 293.66;
+				PWM_On();
+			}
+			break;
+		default:
+			Sound_State = Sound_Start;
+			break;
+	}
+
+	switch (Sound_State)
+	{
+		case Sound_Off:
+			PWM_Off();
+			break;
+		case Sound_OnC4:
+			Set_PWM(frequency);
+			break;
+		case Sound_OnD4:
+			Set_PWM(frequency);
+			break;
+		case Sound_OnE4:
+			Set_PWM(frequency);
+			break;
+		default:
+			break;
+	}
+}
+
 int main(void) {
     /* Insert DDR and PORT initializations */
 	DDRA = 0x00; PORTA = 0xFF;
 	DDRB = 0xFF; PORTB = 0x00;
     /* Insert your solution below */
+	unsigned char tmpA = 0x00;
     while (1) {
-
+	tmpA = PINA & 0x07;
+	Tick_Sound();
+	while (!TimerFlag) {}
+	TimerFlag = 0;
     }
     return 1;
 }
